@@ -1,18 +1,32 @@
 #include <iostream>
-#include "Node.h"
+
+#include "ExecutionEngine.h"
 
 int main()
 {
-    Node multiply_node(OperationType::MULTIPLY, 2.0F);
-    Node relu_node(OperationType::RELU);
+    Tensor input({1.0f, -2.0f, 3.0f});
 
-    std::cout << "Multiply node parameter: "
-              << multiply_node.parameter()
-              << std::endl;
-    
-    std::cout << "ReLU node parameter: "
-              << relu_node.parameter()
-              << std::endl;
+    Node multiply_node(OperationType::MULTIPLY, 2.0f);
+
+    ExecutionEngine engine;
+
+    Tensor output = engine.execute(multiply_node, input);
+
+    std::cout << "Input: ";
+
+    for (float value : input.values())
+    {
+        std::cout << value << " ";
+    }
+
+    std::cout << "\nOutput: ";
+
+    for (float value : output.values())
+    {
+        std::cout << value << " ";
+    }
+
+    std::cout << std::endl;
 
     return 0;
 }
