@@ -53,3 +53,13 @@ Tensor ExecutionEngine::execute(
     return Tensor(output_values);
     
 }
+
+Tensor ExecutionEngine::execute(const Model& model, const Tensor& input) const
+{
+    Tensor current = input;
+    for (const Node& node : model.nodes())
+    {
+        current = execute(node, current);
+    }
+    return current;   
+}
