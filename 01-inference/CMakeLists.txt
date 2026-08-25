@@ -10,6 +10,7 @@ add_executable(mini_ai_runtime
     src/Tensor.cpp
     src/Node.cpp
     src/ExecutionEngine.cpp
+    src/Model.cpp
 )
 
 target_include_directories(mini_ai_runtime PRIVATE include)
