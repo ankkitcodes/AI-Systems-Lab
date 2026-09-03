@@ -1,6 +1,7 @@
 #include "ExecutionEngine.h"
 
 #include <stdexcept>
+#include <unordered_map>
 #include <vector>
 
 Tensor ExecutionEngine::execute(
@@ -17,7 +18,7 @@ Tensor ExecutionEngine::execute(
         {
             output_values.reserve(input.size());
 
-            for(float value : input_values)
+            for (float value : input_values)
             {
                 output_values.push_back(value * node.parameter());
             }
@@ -51,15 +52,47 @@ Tensor ExecutionEngine::execute(
         }
     }
     return Tensor(output_values);
-    
 }
 
-Tensor ExecutionEngine::execute(const Model& model, const Tensor& input) const
+Tensor ExecutionEngine::execute(
+    const Model& model,
+    const Tensor& input) const
 {
-    Tensor current = input;
+    std::unordered_map<std::string, Tensor> tensors;
+
+    if (input.name() != model.input_name())
+    {
+        throw std::runtime_error(
+            "Input tensor name does not match model input"
+        );
+    }
+
+    tensors.insert_or_assign(input.name(), input);
+
     for (const Node& node : model.nodes())
     {
-        current = execute(node, current);
+        auto input_it = tensors.find(node.input_name());
+
+        if (input_it == tensors.end())
+        {
+            throw std::runtime_error(
+                "Input tensor not found: " + node.input_name()
+            );
+        }
+
+        Tensor output = execute(node, input_it->second);
+
+        tensors.insert_or_assign(node.output_name(), output);
     }
-    return current;   
+
+    auto output_it = tensors.find(model.output_name());
+
+    if (output_it == tensors.end())
+    {
+        throw std::runtime_error(
+            "Output tensor not found: " + model.output_name()
+        );
+    }
+
+    return output_it->second;
 }
