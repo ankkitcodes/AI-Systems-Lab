@@ -1,30 +1,14 @@
 #include <iostream>
 
-#include "ExecutionEngine.h"
-#include "Model.h"
+#include "ModelLoader.h"
+#include "Runtime.h"
 
 int main()
 {
-    Model model;
+    ModelLoader loader;
 
-    model.set_input("input");
-    model.set_output("output");
-
-    model.add_node(
-        Node(
-            OperationType::MULTIPLY,
-            "input",
-            "hidden",
-            2.0f
-        )
-    );
-
-    model.add_node(
-        Node(
-            OperationType::RELU,
-            "hidden",
-            "output"
-        )
+    Model model = loader.load(
+        "models/simple_model.txt"
     );
 
     Tensor input(
@@ -32,9 +16,9 @@ int main()
         {1.0f, -2.0f, 3.0f}
     );
 
-    ExecutionEngine engine;
+    Runtime runtime;
 
-    Tensor output = engine.execute(model, input);
+    Tensor output = runtime.run(model, input);
 
     std::cout << "Input: ";
 

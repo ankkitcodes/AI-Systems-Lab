@@ -1,0 +1,4 @@
+INPUT input
+OUTPUT output
+NODE MULTIPLY input hidden 2.0
+NODE RELU hidden output
