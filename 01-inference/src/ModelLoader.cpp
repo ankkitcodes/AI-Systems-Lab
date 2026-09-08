@@ -4,7 +4,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
-
+#include <unordered_set>
 Model ModelLoader::load(const std::string& file_path) const
 {
     std::ifstream file(file_path);
@@ -19,6 +19,12 @@ Model ModelLoader::load(const std::string& file_path) const
     Model model;
 
     std::string line;
+
+    bool has_input = false;
+    bool has_output = false;
+    bool has_node = false;
+
+    std::unordered_set<std::string> available_tensors;
 
     while (std::getline(file, line))
     {
@@ -37,16 +43,26 @@ Model ModelLoader::load(const std::string& file_path) const
             std::string input_name;
 
             stream >> input_name;
-
+            if (input_name.empty())
+            {
+                throw std::runtime_error("INPUT requires a tensor name");
+            }
             model.set_input(input_name);
+            has_input = true;
+            available_tensors.insert(input_name);
         }
+
         else if (keyword == "OUTPUT")
         {
             std::string output_name;
 
             stream >> output_name;
-
+            if (output_name.empty())
+            {
+                throw std::runtime_error("OUTPUT requires a tensor name");
+            }
             model.set_output(output_name);
+            has_output = true;
         }
         else if (keyword == "NODE")
         {
@@ -63,7 +79,11 @@ Model ModelLoader::load(const std::string& file_path) const
                 float parameter;
 
                 stream >> parameter;
-
+                
+                if (available_tensors.find(output_name) != available_tensors.end())
+                {
+                    throw std::runtime_error("Tensor already exists: " + output_name);
+                }
                 model.add_node(
                     Node(
                         OperationType::MULTIPLY,
@@ -72,12 +92,19 @@ Model ModelLoader::load(const std::string& file_path) const
                         parameter
                     )
                 );
+                has_node = true;
+                available_tensors.insert(output_name);
             }
             else if (operation == "ADD")
             {
                 float parameter;
 
                 stream >> parameter;
+
+                if (available_tensors.find(output_name) != available_tensors.end())
+                {
+                    throw std::runtime_error("Tensor already exists: " + output_name);
+                }
 
                 model.add_node(
                     Node(
@@ -87,9 +114,16 @@ Model ModelLoader::load(const std::string& file_path) const
                         parameter
                     )
                 );
+                has_node = true;
+                available_tensors.insert(output_name);
             }
             else if (operation == "RELU")
             {
+                
+                if (available_tensors.find(output_name) != available_tensors.end())
+                {
+                    throw std::runtime_error("Tensor already exists: " + output_name);
+                }
                 model.add_node(
                     Node(
                         OperationType::RELU,
@@ -97,6 +131,8 @@ Model ModelLoader::load(const std::string& file_path) const
                         output_name
                     )
                 );
+                available_tensors.insert(output_name);
+                has_node = true;
             }
             else
             {
@@ -113,5 +149,21 @@ Model ModelLoader::load(const std::string& file_path) const
         }
     }
 
+    if (!has_input)
+    {
+        throw std::runtime_error("Model is missing INPUT");
+    }
+    if (!has_output)
+    {
+        throw std::runtime_error("Model is missing OUTPUT");
+    }
+    if (!has_node)
+    {
+        throw std::runtime_error("Model contains no nodes");
+    }
+    if (available_tensors.find(model.output_name())==available_tensors.end())
+    {
+        throw std::runtime_error("Model output tensor not produced: " + model.output_name());
+    }
     return model;
 }
