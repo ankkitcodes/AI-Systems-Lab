@@ -1,5 +1,5 @@
 #pragma once
-#include <cstddef>
+#include <vector>
 #include <string>
 
 enum class OperationType
@@ -14,19 +14,20 @@ class Node
 public:
     Node(
         OperationType operation, 
-        const std::string& input_name,
-        const std::string& output_name,
+        const std::vector<std::string>& input_names,
+        const std::vector<std::string>& output_names,
         float parameter = 0.0f
     );
 
     OperationType operation() const;
-    const std::string& input_name() const;
-    const std::string& output_name() const;
+    const std::vector<std::string>& input_names() const;
+    const std::vector<std::string>& output_names() const;
     float parameter() const;
 
 private:
     OperationType operation_;
-    std::string input_name_;
-    std::string output_name_;
+
+    std::vector<std::string> input_names_;
+    std::vector<std::string> output_names_;
     float parameter_;
 };

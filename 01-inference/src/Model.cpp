@@ -5,9 +5,9 @@ void Model::add_node(const Node& node)
     nodes_.push_back(node);
 }
 
-void Model::set_input(const std::string& input_name)
+void Model::add_input(const std::string& input_name)
 {
-    input_name_ = input_name;
+    input_names_.push_back(input_name);
 }
 
 void Model::set_output(const std::string& output_name)
@@ -20,9 +20,9 @@ const std::vector<Node>& Model::nodes() const
     return nodes_;
 }
 
-const std::string& Model::input_name() const
+const std::vector<std::string>& Model::input_names() const
 {
-    return input_name_;
+    return input_names_;
 }
 
 const std::string& Model::output_name() const

@@ -9,8 +9,9 @@ add_executable(mini_ai_runtime
     src/main.cpp
     src/Tensor.cpp
     src/Node.cpp
-    src/ExecutionEngine.cpp
     src/Model.cpp
+    src/ExecutionEngine.cpp
+    src/ExecutionPlanner.cpp
     src/Runtime.cpp
     src/ModelLoader.cpp
 )

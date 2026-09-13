@@ -2,108 +2,87 @@
 
 #include <stdexcept>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
-std::vector<Node> topological_sort(
-    const std::vector<Node>& nodes,
-    const std::string& input_name)
-{
-    std::vector<Node> sorted_nodes;
-
-    std::unordered_set<std::string> available_tensors;
-    available_tensors.insert(input_name);
-
-    std::unordered_set<std::size_t> executed;
-
-    while (sorted_nodes.size() < nodes.size())
-    {
-        bool progress = false;
-
-        for (std::size_t i = 0; i < nodes.size(); ++i)
-        {
-            if (executed.find(i) != executed.end())
-            {
-                continue;
-            }
-
-            const Node& node = nodes[i];
-
-            if (available_tensors.find(node.input_name())
-                == available_tensors.end())
-            {
-                continue;
-            }
-
-            sorted_nodes.push_back(node);
-            executed.insert(i);
-
-            available_tensors.insert(node.output_name());
-
-            progress = true;
-        }
-
-        if (!progress)
-        {
-            throw std::runtime_error(
-                "Could not determine graph execution order"
-            );
-        }
-    }
-
-    return sorted_nodes;
-}
 
 Tensor ExecutionEngine::execute(
     const Node& node,
-    const Tensor& input) const
+    const std::vector<Tensor>& inputs) const
 {
-    const auto& input_values = input.values();
-
-    std::vector<float> output_values;
+    if (inputs.empty())
+    {
+        throw std::runtime_error(
+            "Operation received no inputs"
+        );
+    }
 
     switch (node.operation())
     {
         case OperationType::MULTIPLY:
         {
+            const Tensor& input = inputs[0];
+
+            std::vector<float> output_values;
             output_values.reserve(input.size());
 
-            for (float value : input_values)
+            for (float value : input.values())
             {
                 output_values.push_back(
                     value * node.parameter()
                 );
             }
 
-            break;
+            return Tensor(output_values);
         }
 
         case OperationType::RELU:
         {
+            const Tensor& input = inputs[0];
+
+            std::vector<float> output_values;
             output_values.reserve(input.size());
 
-            for (float value : input_values)
+            for (float value : input.values())
             {
                 output_values.push_back(
                     value > 0.0f ? value : 0.0f
                 );
             }
 
-            break;
+            return Tensor(output_values);
         }
 
         case OperationType::ADD:
         {
-            output_values.reserve(input.size());
-
-            for (float value : input_values)
+            if (inputs.size() != 2)
             {
-                output_values.push_back(
-                    value + node.parameter()
+                throw std::runtime_error(
+                    "ADD expects exactly two inputs"
                 );
             }
 
-            break;
+            const Tensor& first = inputs[0];
+            const Tensor& second = inputs[1];
+
+            if (first.size() != second.size())
+            {
+                throw std::runtime_error(
+                    "ADD inputs must have the same size"
+                );
+            }
+
+            std::vector<float> output_values;
+            output_values.reserve(first.size());
+
+            for (std::size_t i = 0; i < first.size(); ++i)
+            {
+                output_values.push_back(
+                    first.values()[i] +
+                    second.values()[i]
+                );
+            }
+
+            return Tensor(output_values);
         }
 
         default:
@@ -113,48 +92,107 @@ Tensor ExecutionEngine::execute(
             );
         }
     }
-
-    return Tensor(output_values);
 }
+
 
 Tensor ExecutionEngine::execute(
     const Model& model,
-    const Tensor& input) const
+    const std::vector<Tensor>& inputs) const
 {
-    std::unordered_map<std::string, Tensor> tensors;
-
-    if (input.name() != model.input_name())
+    if (inputs.size() != model.input_names().size())
     {
         throw std::runtime_error(
-            "Input tensor name does not match model input"
+            "Number of input tensors does not match model inputs"
         );
     }
 
-    tensors.insert_or_assign(
-        input.name(),
-        input
-    );
+    std::unordered_map<std::string, Tensor> tensors;
 
-    const std::vector<Node> execution_order =
-        topological_sort(
-            model.nodes(),
-            model.input_name()
-        );
-
-    for (const Node& node : execution_order)
+    // Register all model input tensors.
+    for (const Tensor& input : inputs)
     {
-        auto input_it = tensors.find(node.input_name());
-
-        if (input_it == tensors.end())
+        if (input.name().empty())
         {
-            throw std::runtime_error("Input tensor not found: " + node.input_name());
+            throw std::runtime_error(
+                "Input tensor must have a name"
+            );
         }
 
-        Tensor output = execute(node,input_it->second);
+        if (tensors.find(input.name()) != tensors.end())
+        {
+            throw std::runtime_error(
+                "Duplicate input tensor: " + input.name()
+            );
+        }
 
-        tensors.insert_or_assign(node.output_name(), output);
+        tensors.insert_or_assign(
+            input.name(),
+            input
+        );
     }
 
+    // Make sure every input required by the model was provided.
+    for (const std::string& input_name : model.input_names())
+    {
+        if (tensors.find(input_name) == tensors.end())
+        {
+            throw std::runtime_error(
+                "Required model input not provided: " +
+                input_name
+            );
+        }
+    }
+
+    // Determine the order in which nodes should execute.
+    const std::vector<Node> execution_order =
+        planner_.create_plan(
+            model.nodes(),
+            model.input_names()
+        );
+
+    // Execute nodes in dependency order.
+    for (const Node& node : execution_order)
+    {
+        if (node.output_names().size() != 1)
+        {
+            throw std::runtime_error(
+                "Current execution engine expects exactly one output"
+            );
+        }
+
+        std::vector<Tensor> node_inputs;
+
+        for (const std::string& input_name : node.input_names())
+        {
+            auto input_it = tensors.find(input_name);
+
+            if (input_it == tensors.end())
+            {
+                throw std::runtime_error(
+                    "Input tensor not found: " + input_name
+                );
+            }
+
+            node_inputs.push_back(
+                input_it->second
+            );
+        }
+
+        const std::string& output_name =
+            node.output_names()[0];
+
+        Tensor output = execute(
+            node,
+            node_inputs
+        );
+
+        tensors.insert_or_assign(
+            output_name,
+            output
+        );
+    }
+
+    // Find the final graph output.
     auto output_it = tensors.find(
         model.output_name()
     );

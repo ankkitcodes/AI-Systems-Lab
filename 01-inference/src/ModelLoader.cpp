@@ -47,7 +47,7 @@ Model ModelLoader::load(const std::string& file_path) const
             {
                 throw std::runtime_error("INPUT requires a tensor name");
             }
-            model.set_input(input_name);
+            model.add_input(input_name);
             has_input = true;
             available_tensors.insert(input_name);
         }
@@ -67,73 +67,123 @@ Model ModelLoader::load(const std::string& file_path) const
         else if (keyword == "NODE")
         {
             std::string operation;
-            std::string input_name;
-            std::string output_name;
-
             stream >> operation;
-            stream >> input_name;
-            stream >> output_name;
 
             if (operation == "MULTIPLY")
             {
+                std::string input_name;
+                std::string output_name;
                 float parameter;
 
+                stream >> input_name;
+                stream >> output_name;
                 stream >> parameter;
-                
-                if (available_tensors.find(output_name) != available_tensors.end())
+
+                if (input_name.empty() || output_name.empty())
                 {
-                    throw std::runtime_error("Tensor already exists: " + output_name);
+                    throw std::runtime_error(
+                        "MULTIPLY requires input and output tensor names"
+                    );
                 }
+
+                if (available_tensors.find(output_name)
+                    != available_tensors.end())
+                {
+                    throw std::runtime_error(
+                        "Tensor already exists: " + output_name
+                    );
+                }
+
                 model.add_node(
                     Node(
                         OperationType::MULTIPLY,
-                        input_name,
-                        output_name,
+                        {input_name},
+                        {output_name},
                         parameter
                     )
                 );
+
                 has_node = true;
                 available_tensors.insert(output_name);
             }
+
+            else if (operation == "RELU")
+            {
+                std::string input_name;
+                std::string output_name;
+
+                stream >> input_name;
+                stream >> output_name;
+
+                if (input_name.empty() || output_name.empty())
+                {
+                    throw std::runtime_error(
+                        "RELU requires input and output tensor names"
+                    );
+                }
+
+                if (available_tensors.find(output_name)
+                    != available_tensors.end())
+                {
+                    throw std::runtime_error(
+                        "Tensor already exists: " + output_name
+                    );
+                }
+
+                model.add_node(
+                    Node(
+                        OperationType::RELU,
+                        {input_name},
+                        {output_name}
+                    )
+                );
+
+                has_node = true;
+                available_tensors.insert(output_name);
+            }
+
             else if (operation == "ADD")
             {
-                float parameter;
+                std::string first_input_name;
+                std::string second_input_name;
+                std::string output_name;
 
-                stream >> parameter;
+                stream >> first_input_name;
+                stream >> second_input_name;
+                stream >> output_name;
 
-                if (available_tensors.find(output_name) != available_tensors.end())
+                if (first_input_name.empty() ||
+                    second_input_name.empty() ||
+                    output_name.empty())
                 {
-                    throw std::runtime_error("Tensor already exists: " + output_name);
+                    throw std::runtime_error(
+                        "ADD requires two input tensors and one output tensor"
+                    );
+                }
+
+                if (available_tensors.find(output_name)
+                    != available_tensors.end())
+                {
+                    throw std::runtime_error(
+                        "Tensor already exists: " + output_name
+                    );
                 }
 
                 model.add_node(
                     Node(
                         OperationType::ADD,
-                        input_name,
-                        output_name,
-                        parameter
+                        {
+                            first_input_name,
+                            second_input_name
+                        },
+                        {output_name}
                     )
                 );
+
                 has_node = true;
                 available_tensors.insert(output_name);
             }
-            else if (operation == "RELU")
-            {
-                
-                if (available_tensors.find(output_name) != available_tensors.end())
-                {
-                    throw std::runtime_error("Tensor already exists: " + output_name);
-                }
-                model.add_node(
-                    Node(
-                        OperationType::RELU,
-                        input_name,
-                        output_name
-                    )
-                );
-                available_tensors.insert(output_name);
-                has_node = true;
-            }
+
             else
             {
                 throw std::runtime_error(
