@@ -184,6 +184,46 @@ Model ModelLoader::load(const std::string& file_path) const
                 available_tensors.insert(output_name);
             }
 
+            else if (operation == "MATMUL")
+            {
+                std::string first_input_name;
+                std::string second_input_name;
+                std::string output_name;
+
+                stream >> first_input_name;
+                stream >> second_input_name;
+                stream >> output_name;
+
+                if (first_input_name.empty() ||
+                    second_input_name.empty() ||
+                    output_name.empty())
+                {
+                    throw std::runtime_error(
+                        "MATMUL requires two input tensors and one output tensor"
+                    );
+                }
+
+                if (available_tensors.find(output_name) != available_tensors.end())
+                {
+                    throw std::runtime_error(
+                        "Tensor already exists: " + output_name
+                    );
+                }
+                model.add_node(
+                    Node(
+                        OperationType::MATMUL,
+                        {
+                            first_input_name,
+                            second_input_name
+                        },
+                        {output_name}
+                    )
+                );
+
+                has_node = true;
+                available_tensors.insert(output_name);
+            }
+
             else
             {
                 throw std::runtime_error(

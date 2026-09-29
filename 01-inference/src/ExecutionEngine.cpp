@@ -32,7 +32,7 @@ Tensor ExecutionEngine::execute(
                 );
             }
 
-            return Tensor(output_values);
+            return Tensor(output_values, input.shape());
         }
 
         case OperationType::RELU:
@@ -49,7 +49,7 @@ Tensor ExecutionEngine::execute(
                 );
             }
 
-            return Tensor(output_values);
+            return Tensor(output_values, input.shape());
         }
 
         case OperationType::ADD:
@@ -71,6 +71,13 @@ Tensor ExecutionEngine::execute(
                 );
             }
 
+            if (first.shape() != second.shape())
+            {
+                throw std::runtime_error(
+                    "ADD inputs must have the same shape"
+                );
+            }
+
             std::vector<float> output_values;
             output_values.reserve(first.size());
 
@@ -82,7 +89,70 @@ Tensor ExecutionEngine::execute(
                 );
             }
 
-            return Tensor(output_values);
+            return Tensor(output_values, first.shape());
+        }
+
+        case OperationType::MATMUL:
+        {
+            if (inputs.size() != 2)
+            {
+                throw std::runtime_error(
+                    "MATMUL expects exactly two inputs"
+                );
+            }
+
+            const Tensor& first = inputs[0];
+            const Tensor& second = inputs[1];
+
+            // MATMUL currenlty supports only 2-D tensors.
+            if (first.shape().size() != 2 ||
+                second.shape().size() != 2 )
+            {
+                throw std::runtime_error(
+                    "MATMUL expects 2-D tensors"
+                );
+            }
+
+            const std::size_t rows_a = first.shape()[0];
+            const std::size_t cols_a = first.shape()[1];
+
+            const std::size_t rows_b = second.shape()[0];
+            const std::size_t cols_b = second.shape()[1];
+
+            // A[m,k] x B[k,n] requires:
+            // A's columns == B's rows
+            if (cols_a != rows_b)
+            {
+                throw std::runtime_error(
+                    "MATMUL dimensions are incompatible"
+                );
+            }
+
+            std::vector<float> output_values(
+                rows_a * cols_b,
+                0.0f
+            );
+
+            for (std::size_t i = 0; i < rows_a; ++i)
+            {
+                for (std::size_t j = 0; j < cols_b; ++j)
+                {
+                    float sum = 0.0f;
+                    for (std::size_t k = 0; k < cols_a; ++k)
+                    {
+                        sum +=
+                            first.values()[i * cols_a + k] *
+                            second.values()[k * cols_b + j];
+                    }
+
+                    output_values[i * cols_b + j] = sum;
+                }
+            }
+
+            return Tensor(
+                output_values,
+                {rows_a, cols_b}
+            );
         }
 
         default:

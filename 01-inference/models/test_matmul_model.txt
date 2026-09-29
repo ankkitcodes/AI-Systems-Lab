@@ -1,0 +1,5 @@
+INPUT a
+INPUT b
+OUTPUT output
+
+NODE MATMUL a b output

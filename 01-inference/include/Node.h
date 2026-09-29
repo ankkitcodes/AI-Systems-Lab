@@ -6,7 +6,8 @@ enum class OperationType
 {
     ADD,
     MULTIPLY,
-    RELU
+    RELU,
+    MATMUL
 };
 
 class Node
